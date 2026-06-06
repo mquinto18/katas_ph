@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import { useRouter } from "next/navigation";
 import AppBar from "@mui/material/AppBar";
 import Toolbar from "@mui/material/Toolbar";
 import Avatar from "@mui/material/Avatar";
@@ -12,23 +12,41 @@ import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Divider from "@mui/material/Divider";
 import ListItemIcon from "@mui/material/ListItemIcon";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import Tooltip from "@mui/material/Tooltip";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
+import type { User } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
+import { usePrinter } from "@/context/PrinterContext";
 
 interface TopNavProps {
-  username?: string;
+  user: User | null;
 }
 
-export default function TopNav({ username = "Admin" }: TopNavProps) {
+export default function TopNav({ user }: TopNavProps) {
+  const router = useRouter();
   const [anchor, setAnchor] = useState<null | HTMLElement>(null);
+  const { connected, connecting, connect, disconnect } = usePrinter();
 
-  const initials = username
+  const displayName = user?.user_metadata?.full_name
+    ?? user?.user_metadata?.name
+    ?? user?.email?.split("@")[0]
+    ?? "Admin";
+
+  const initials = displayName
     .split(" ")
-    .map((n) => n[0])
+    .map((n: string) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
+
+  const handleLogout = async () => {
+    setAnchor(null);
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  };
 
   return (
     <AppBar
@@ -61,109 +79,95 @@ export default function TopNav({ username = "Admin" }: TopNavProps) {
           </Box>
         </Box>
 
-        {/* User section */}
-        <Box>
-          <IconButton
-            onClick={(e) => setAnchor(e.currentTarget)}
-            disableRipple
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              borderRadius: 2,
-              px: 1.5,
-              py: 0.75,
-              "&:hover": { backgroundColor: "#f5f5f5" },
-            }}
-          >
-            <Avatar
+        {/* Right side */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          {/* Printer button */}
+          <Tooltip title={connected ? "Printer Connected — Click to disconnect" : "Connect Printer"} arrow>
+            <Box
+              onClick={connected ? disconnect : connect}
               sx={{
-                bgcolor: "#2E7D32",
-                width: 34,
-                height: 34,
-                fontSize: "0.8rem",
-                fontWeight: 700,
+                display: "flex", alignItems: "center", gap: 1,
+                px: 1.5, py: 0.75, borderRadius: 2, cursor: "pointer",
+                border: connected ? "1.5px solid #2E7D32" : "1.5px solid #e0e0e0",
+                backgroundColor: connected ? "#f1f8f1" : "#ffffff",
+                transition: "all 0.15s",
+                "&:hover": { borderColor: "#2E7D32", backgroundColor: "#f1f8f1" },
+                opacity: connecting ? 0.6 : 1,
+                pointerEvents: connecting ? "none" : "auto",
               }}
             >
-              {initials}
-            </Avatar>
-            <Typography
-              variant="body2"
-              sx={{
-                color: "#212121",
-                fontWeight: 600,
-                display: { xs: "none", sm: "block" },
-              }}
-            >
-              {username}
-            </Typography>
-            <KeyboardArrowDownIcon
-              sx={{
-                fontSize: 18,
-                color: "#757575",
-                display: { xs: "none", sm: "block" },
-                transition: "transform 0.2s",
-                transform: anchor ? "rotate(180deg)" : "rotate(0deg)",
-              }}
-            />
-          </IconButton>
-
-          <Menu
-            anchorEl={anchor}
-            open={Boolean(anchor)}
-            onClose={() => setAnchor(null)}
-            transformOrigin={{ horizontal: "right", vertical: "top" }}
-            anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
-            slotProps={{
-              paper: {
-                elevation: 0,
-                sx: {
-                  mt: 1,
-                  minWidth: 200,
-                  borderRadius: 2,
-                  border: "1px solid #f0f0f0",
-                  boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
-                  overflow: "visible",
-                },
-              },
-            }}
-          >
-            {/* User info header */}
-            <Box sx={{ px: 2, py: 1.5 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: "#212121" }}>
-                {username}
+              <PrintOutlinedIcon sx={{ fontSize: 16, color: connected ? "#2E7D32" : "#9e9e9e" }} />
+              <Typography variant="caption" sx={{ fontWeight: 600, color: connected ? "#2E7D32" : "#9e9e9e", display: { xs: "none", sm: "block" } }}>
+                {connecting ? "Connecting…" : connected ? "Printer On" : "Connect Printer"}
               </Typography>
-              <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                Administrator
-              </Typography>
+              <Box sx={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: connected ? "#2E7D32" : "#e0e0e0", flexShrink: 0 }} />
             </Box>
+          </Tooltip>
 
-            <Divider />
-
-            <MenuItem
-              onClick={() => setAnchor(null)}
-              sx={{ py: 1.25, px: 2, gap: 1.5, "&:hover": { backgroundColor: "#f9fbe7" } }}
+          {/* User menu */}
+          <Box>
+            <IconButton
+              onClick={(e) => setAnchor(e.currentTarget)}
+              disableRipple
+              sx={{
+                display: "flex", alignItems: "center", gap: 1,
+                borderRadius: 2, px: 1.5, py: 0.75,
+                "&:hover": { backgroundColor: "#f5f5f5" },
+              }}
             >
-              <ListItemIcon sx={{ minWidth: "unset" }}>
-                <SettingsOutlinedIcon fontSize="small" sx={{ color: "#2E7D32" }} />
-              </ListItemIcon>
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                Settings
+              <Avatar sx={{ bgcolor: "#2E7D32", width: 34, height: 34, fontSize: "0.8rem", fontWeight: 700 }}>
+                {initials}
+              </Avatar>
+              <Typography variant="body2" sx={{ color: "#212121", fontWeight: 600, display: { xs: "none", sm: "block" } }}>
+                {displayName}
               </Typography>
-            </MenuItem>
+              <KeyboardArrowDownIcon
+                sx={{
+                  fontSize: 18, color: "#757575",
+                  display: { xs: "none", sm: "block" },
+                  transition: "transform 0.2s",
+                  transform: anchor ? "rotate(180deg)" : "rotate(0deg)",
+                }}
+              />
+            </IconButton>
 
-            <MenuItem
-              onClick={() => setAnchor(null)}
-              sx={{ py: 1.25, px: 2, gap: 1.5, "&:hover": { backgroundColor: "#fff8f8" } }}
+            <Menu
+              anchorEl={anchor}
+              open={Boolean(anchor)}
+              onClose={() => setAnchor(null)}
+              transformOrigin={{ horizontal: "right", vertical: "top" }}
+              anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
+              slotProps={{
+                paper: {
+                  elevation: 0,
+                  sx: { mt: 1, minWidth: 200, borderRadius: 2, border: "1px solid #f0f0f0", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", overflow: "visible" },
+                },
+              }}
             >
-              <ListItemIcon sx={{ minWidth: "unset" }}>
-                <LogoutOutlinedIcon fontSize="small" sx={{ color: "#d32f2f" }} />
-              </ListItemIcon>
-              <Typography variant="body2" sx={{ fontWeight: 500, color: "#d32f2f" }}>
-                Logout
-              </Typography>
-            </MenuItem>
-          </Menu>
+              <Box sx={{ px: 2, py: 1.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: "#212121" }}>
+                  {displayName}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  {user?.email ?? ""}
+                </Typography>
+              </Box>
+
+              <Divider />
+
+              <MenuItem
+                onClick={handleLogout}
+                sx={{ py: 1.25, px: 2, gap: 1.5, "&:hover": { backgroundColor: "#fff8f8" } }}
+              >
+                <ListItemIcon sx={{ minWidth: "unset" }}>
+                  <LogoutOutlinedIcon fontSize="small" sx={{ color: "#d32f2f" }} />
+                </ListItemIcon>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: "#d32f2f" }}>
+                  Logout
+                </Typography>
+              </MenuItem>
+            </Menu>
+          </Box>
         </Box>
       </Toolbar>
     </AppBar>

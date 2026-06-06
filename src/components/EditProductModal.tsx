@@ -12,28 +12,27 @@ import Switch from "@mui/material/Switch";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Divider from "@mui/material/Divider";
 import CloseIcon from "@mui/icons-material/Close";
-import AddIcon from "@mui/icons-material/Add";
+import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import AddPhotoAlternateOutlinedIcon from "@mui/icons-material/AddPhotoAlternateOutlined";
 import { type Product, type CategoryValue } from "./ProductCard";
 import { useCategories } from "@/context/CategoriesContext";
 
 interface Props {
   open: boolean;
+  product: Product | null;
   onClose: () => void;
-  onAdd: (product: Omit<Product, "id">, imageFile?: File) => void;
+  onEdit: (updated: Product, imageFile?: File) => void;
 }
 
-const EMPTY = {
-  name: "",
-  category: "rice-meals" as CategoryValue,
-  price: "",
-  image: "",
-  available: true,
-};
-
-export default function AddProductModal({ open, onClose, onAdd }: Props) {
+export default function EditProductModal({ open, product, onClose, onEdit }: Props) {
   const { categories } = useCategories();
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState({
+    name:      product?.name      ?? "",
+    category:  (product?.category ?? "rice-meals") as CategoryValue,
+    price:     product            ? String(product.price) : "",
+    available: product?.available ?? true,
+    image:     product?.image     ?? "",
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [imageFile, setImageFile] = useState<File | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,25 +59,22 @@ export default function AddProductModal({ open, onClose, onAdd }: Props) {
   };
 
   const handleSubmit = () => {
-    if (!validate()) return;
-    onAdd(
+    if (!validate() || !product) return;
+    onEdit(
       {
+        id:        product.id,
         name:      form.name.trim(),
         category:  form.category,
         price:     Number(form.price),
-        image:     form.image,
         available: form.available,
+        image:     form.image,
       },
       imageFile,
     );
-    setForm(EMPTY);
-    setErrors({});
-    setImageFile(undefined);
     onClose();
   };
 
   const handleClose = () => {
-    setForm(EMPTY);
     setErrors({});
     setImageFile(undefined);
     onClose();
@@ -93,21 +89,16 @@ export default function AddProductModal({ open, onClose, onAdd }: Props) {
       slotProps={{ paper: { sx: { borderRadius: 3, overflow: "hidden" } } }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          px: 3, py: 2, borderBottom: "1px solid #f0f0f0",
-        }}
-      >
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 3, py: 2, borderBottom: "1px solid #f0f0f0" }}>
         <Box>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: "#212121", lineHeight: 1.2 }}>
-            Add Product
+          <Typography variant="h6" sx={{ fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>
+            Edit Product
           </Typography>
           <Typography variant="caption" sx={{ color: "#9e9e9e" }}>
-            Fill in the details to add a new item
+            Update the details for this item
           </Typography>
         </Box>
-        <IconButton onClick={handleClose} size="small" sx={{ color: "#bdbdbd", "&:hover": { color: "#424242" } }}>
+        <IconButton onClick={handleClose} size="small" sx={{ color: "#bdbdbd", "&:hover": { color: "#424242" }, borderRadius: 1.5 }}>
           <CloseIcon fontSize="small" />
         </IconButton>
       </Box>
@@ -119,22 +110,19 @@ export default function AddProductModal({ open, onClose, onAdd }: Props) {
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Box
             sx={{
-              width: 64, height: 64, borderRadius: 2.5,
-              backgroundColor: "#f5f5f5",
-              overflow: "hidden",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0,
-              border: "1px solid rgba(0,0,0,0.06)",
+              width: 64, height: 64, borderRadius: 2.5, backgroundColor: "#f5f5f5",
+              overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0, border: "1px solid #ebebeb",
             }}
           >
             {form.image ? (
               <img src={form.image} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
-              <AddPhotoAlternateOutlinedIcon sx={{ fontSize: 28, color: "#bdbdbd" }} />
+              <AddPhotoAlternateOutlinedIcon sx={{ fontSize: 28, color: "#d0d0d0" }} />
             )}
           </Box>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="body2" sx={{ fontWeight: 700, color: form.name ? "#212121" : "#bdbdbd" }}>
+            <Typography variant="body2" sx={{ fontWeight: 700, color: form.name ? "#1a1a1a" : "#bdbdbd" }}>
               {form.name || "Product name preview"}
             </Typography>
             <Typography variant="caption" sx={{ color: "#9e9e9e" }}>
@@ -147,13 +135,7 @@ export default function AddProductModal({ open, onClose, onAdd }: Props) {
 
         {/* Image upload */}
         <Box>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: "none" }}
-            onChange={handleImageChange}
-          />
+          <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageChange} />
           <Button
             fullWidth
             variant="outlined"
@@ -170,7 +152,7 @@ export default function AddProductModal({ open, onClose, onAdd }: Props) {
           </Button>
         </Box>
 
-        {/* Row 1: Name */}
+        {/* Name */}
         <TextField
           label="Product Name"
           value={form.name}
@@ -182,7 +164,7 @@ export default function AddProductModal({ open, onClose, onAdd }: Props) {
           sx={fieldSx}
         />
 
-        {/* Row 2: Category + Price */}
+        {/* Category + Price */}
         <Box sx={{ display: "flex", gap: 2 }}>
           <TextField
             select
@@ -237,9 +219,9 @@ export default function AddProductModal({ open, onClose, onAdd }: Props) {
           variant="outlined"
           onClick={handleClose}
           sx={{
-            py: 1.3, borderRadius: 2.5, fontWeight: 700, textTransform: "none",
+            py: 1.3, borderRadius: 2, fontWeight: 700, textTransform: "none",
             borderColor: "#e0e0e0", color: "#616161",
-            "&:hover": { borderColor: "#9e9e9e", backgroundColor: "#f5f5f5" },
+            "&:hover": { borderColor: "#bdbdbd", backgroundColor: "#f5f5f5" },
           }}
         >
           Cancel
@@ -247,15 +229,15 @@ export default function AddProductModal({ open, onClose, onAdd }: Props) {
         <Button
           fullWidth
           variant="contained"
-          startIcon={<AddIcon />}
+          startIcon={<SaveOutlinedIcon />}
           onClick={handleSubmit}
           sx={{
-            py: 1.3, borderRadius: 2.5, fontWeight: 700, textTransform: "none",
+            py: 1.3, borderRadius: 2, fontWeight: 700, textTransform: "none",
             backgroundColor: "#2E7D32", boxShadow: "none",
             "&:hover": { backgroundColor: "#1b5e20", boxShadow: "none" },
           }}
         >
-          Add Product
+          Save Changes
         </Button>
       </Box>
     </Dialog>

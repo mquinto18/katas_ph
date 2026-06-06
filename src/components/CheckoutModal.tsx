@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Dialog from "@mui/material/Dialog";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
@@ -17,11 +17,14 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
 import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
 import { type Product } from "./ProductCard";
+import Receipt from "./Receipt";
+import { insertOrder } from "@/lib/ordersService";
+import { usePrinter } from "@/context/PrinterContext";
+import { useBusinessSettings } from "@/context/BusinessSettingsContext";
 
 interface OrderItem {
   product: Product;
   quantity: number;
-  addons: string[];
 }
 
 interface Props {
@@ -33,12 +36,6 @@ interface Props {
   onConfirm: (paymentMethod: string) => void;
 }
 
-const ADDON_PRICES: Record<string, number> = {
-  "Extra Tapioca": 15, "Whipped Cream": 20,
-  "Extra Rice": 25, "Extra Sauce": 10,
-  "Extra Dip": 10, "Large Pack": 20,
-};
-
 const ORDER_TYPE_LABELS: Record<string, string> = {
   "dine-in": "Dine-In",
   "takeout": "Take Out",
@@ -46,22 +43,78 @@ const ORDER_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function CheckoutModal({ open, onClose, orderItems, orderType, orderTotal, onConfirm }: Props) {
+  const { connected, print } = usePrinter();
+  const { settings: bizSettings } = useBusinessSettings();
   const [payment, setPayment] = useState<"cash" | "online" | null>(null);
   const [cashAmount, setCashAmount] = useState<string>("");
   const [confirmed, setConfirmed] = useState(false);
+  const [receiptMeta, setReceiptMeta] = useState({ date: "", time: "", number: "" });
+  const [downloaded, setDownloaded] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [animKey, setAnimKey] = useState(0);
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  const triggerPrint = () => {
+    if (!receiptRef.current) return;
+    const content = receiptRef.current.innerHTML;
+    const printWindow = window.open("", "_blank", "width=400,height=700");
+    if (!printWindow) return;
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Receipt #${receiptMeta.number}</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;justify-content:center;background:#fff;}</style></head><body>${content}</body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.onload = () => { printWindow.print(); };
+    setDownloaded(true);
+  };
+
+  const handleOpenPreview = () => {
+    setAnimKey((k) => k + 1);
+    setPreviewOpen(true);
+    setTimeout(() => triggerPrint(), 100);
+  };
 
   const cashValue = parseFloat(cashAmount) || 0;
   const change = cashValue - orderTotal;
 
 
-  const getItemSubtotal = (item: OrderItem) => {
-    const addonTotal = item.addons.reduce((sum, a) => sum + (ADDON_PRICES[a] ?? 0), 0);
-    return (item.product.price + addonTotal) * item.quantity;
-  };
+  const getItemSubtotal = (item: OrderItem) => item.product.price * item.quantity;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!payment) return;
+    const now = new Date();
+    setReceiptMeta({
+      date:   now.toLocaleDateString("en-GB"),
+      time:   now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+      number: now.getTime().toString().slice(-8),
+    });
+    await insertOrder({
+      order_type: orderType,
+      payment,
+      total: orderTotal,
+      items: orderItems.map((i) => ({
+        name:     i.product.name,
+        quantity: i.quantity,
+        price:    i.product.price,
+      })),
+    });
     setConfirmed(true);
+
+    // Auto-print if printer is connected
+    if (connected) {
+      await print({
+        orderItems: orderItems.map((i) => ({ name: i.product.name, quantity: i.quantity, price: i.product.price })),
+        orderType,
+        total: orderTotal,
+        payment: payment!,
+        cashReceived: cashValue > 0 ? cashValue : undefined,
+        change: cashValue > 0 ? cashValue - orderTotal : undefined,
+        receiptNumber: now.getTime().toString().slice(-8),
+        date: now.toLocaleDateString("en-GB"),
+        time: now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+        shopName: bizSettings.shop_name,
+        shopAddress: bizSettings.address,
+        receiptFooter: bizSettings.receipt_footer,
+      });
+    }
   };
 
   const handleNextOrder = () => {
@@ -69,16 +122,19 @@ export default function CheckoutModal({ open, onClose, orderItems, orderType, or
     setPayment(null);
     setCashAmount("");
     setConfirmed(false);
+    setDownloaded(false);
   };
 
   const handleClose = () => {
     setPayment(null);
     setCashAmount("");
     setConfirmed(false);
+    setDownloaded(false);
     onClose();
   };
 
   return (
+    <>
     <Dialog
       open={open}
       onClose={handleClose}
@@ -189,14 +245,16 @@ export default function CheckoutModal({ open, onClose, orderItems, orderType, or
               fullWidth
               variant="outlined"
               startIcon={<PrintOutlinedIcon />}
-              onClick={handleClose}
+              onClick={handleOpenPreview}
+              disabled={downloaded}
               sx={{
                 py: 1.3, borderRadius: 2.5, fontWeight: 700, fontSize: "0.9rem",
                 textTransform: "none", borderColor: "#2E7D32", color: "#2E7D32",
                 "&:hover": { backgroundColor: "#f1f8f1", borderColor: "#1b5e20" },
+                "&.Mui-disabled": { borderColor: "#e0e0e0", color: "#bdbdbd" },
               }}
             >
-              Print Receipt
+              {downloaded ? "Printed" : "Print Receipt"}
             </Button>
             <Button
               fullWidth
@@ -258,11 +316,6 @@ export default function CheckoutModal({ open, onClose, orderItems, orderType, or
                   <Typography variant="body2" sx={{ fontWeight: 700, color: "#212121" }} noWrap>
                     {item.product.name}
                   </Typography>
-                  {item.addons.length > 0 && (
-                    <Typography variant="caption" sx={{ color: "#9e9e9e" }}>
-                      {item.addons.join(", ")}
-                    </Typography>
-                  )}
                 </Box>
                 <Box sx={{ textAlign: "right", flexShrink: 0 }}>
                   <Typography variant="body2" sx={{ fontWeight: 800, color: "#2E7D32" }}>
@@ -380,5 +433,81 @@ export default function CheckoutModal({ open, onClose, orderItems, orderType, or
       </>
       )}
     </Dialog>
+
+    {/* Receipt Preview Dialog */}
+    <Dialog
+      open={previewOpen}
+      onClose={() => setPreviewOpen(false)}
+      maxWidth="xs"
+      fullWidth
+      slotProps={{ paper: { sx: { borderRadius: 3, overflow: "hidden" } } }}
+    >
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 3, py: 2, borderBottom: "1px solid #f0f0f0" }}>
+        <Typography variant="h6" sx={{ fontWeight: 800, color: "#1a1a1a", fontSize: "1rem" }}>
+          Receipt Preview
+        </Typography>
+        <IconButton size="small" onClick={() => setPreviewOpen(false)} sx={{ color: "#bdbdbd", "&:hover": { color: "#424242" } }}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Box>
+
+      {/* Receipt shown in preview */}
+      <Box sx={{ overflowY: "auto", maxHeight: "65vh", display: "flex", justifyContent: "center", backgroundColor: "#f5f5f5", p: 2 }}>
+        <Box sx={{ boxShadow: "0 2px 16px rgba(0,0,0,0.12)" }}>
+          <Receipt
+            orderItems={orderItems}
+            orderType={orderType}
+            orderTotal={orderTotal}
+            payment={payment ?? "cash"}
+            cashReceived={cashValue > 0 ? cashValue : undefined}
+            change={cashValue > 0 ? change : undefined}
+            receiptNumber={receiptMeta.number}
+            date={receiptMeta.date}
+            time={receiptMeta.time}
+            shopName={bizSettings.shop_name}
+            shopAddress={bizSettings.address}
+            receiptFooter={bizSettings.receipt_footer}
+          />
+        </Box>
+      </Box>
+
+      <Box sx={{ px: 3, py: 2, borderTop: "1px solid #f0f0f0", display: "flex", gap: 1.5 }}>
+        <Button
+          fullWidth variant="outlined"
+          onClick={() => setPreviewOpen(false)}
+          sx={{ py: 1.2, borderRadius: 2, fontWeight: 700, textTransform: "none", borderColor: "#e0e0e0", color: "#616161", "&:hover": { borderColor: "#bdbdbd", backgroundColor: "#f5f5f5" } }}
+        >
+          Close
+        </Button>
+        <Button
+          fullWidth variant="contained"
+          startIcon={<PrintOutlinedIcon />}
+          onClick={triggerPrint}
+          sx={{ py: 1.2, borderRadius: 2, fontWeight: 700, textTransform: "none", backgroundColor: "#2E7D32", boxShadow: "none", "&:hover": { backgroundColor: "#1b5e20", boxShadow: "none" } }}
+        >
+          Print Again
+        </Button>
+      </Box>
+    </Dialog>
+
+    {/* Hidden receipt for print */}
+    <div style={{ position: "fixed", left: -9999, top: -9999, pointerEvents: "none" }}>
+      <Receipt
+        ref={receiptRef}
+        orderItems={orderItems}
+        orderType={orderType}
+        orderTotal={orderTotal}
+        payment={payment ?? "cash"}
+        cashReceived={cashValue > 0 ? cashValue : undefined}
+        change={cashValue > 0 ? change : undefined}
+        receiptNumber={receiptMeta.number}
+        date={receiptMeta.date}
+        time={receiptMeta.time}
+        shopName={bizSettings.shop_name}
+        shopAddress={bizSettings.address}
+        receiptFooter={bizSettings.receipt_footer}
+      />
+    </div>
+    </>
   );
 }

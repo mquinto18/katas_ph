@@ -7,14 +7,10 @@ import Chip from "@mui/material/Chip";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import ProductModal from "./ProductModal";
+import { useCategories } from "@/context/CategoriesContext";
 
-export type CategoryValue = "cafe" | "meals" | "snack";
-
-export const CATEGORY_LABELS: Record<CategoryValue, string> = {
-  cafe: "Cafe & Drinks",
-  meals: "Meals",
-  snack: "Food & Snack",
-};
+export type CategoryValue = string;
+export const CATEGORY_LABELS: Record<string, string> = {};
 
 export interface Product {
   id: number;
@@ -27,11 +23,12 @@ export interface Product {
 
 interface Props {
   product: Product;
-  onAddToOrder?: (product: Product, quantity: number, addons: string[]) => void;
+  onAddToOrder?: (product: Product, quantity: number) => void;
 }
 
 export default function ProductCard({ product, onAddToOrder }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
+  const { categoryMap } = useCategories();
 
   return (
     <>
@@ -77,7 +74,7 @@ export default function ProductCard({ product, onAddToOrder }: Props) {
 
         <CardContent sx={{ p: 2, flex: 1, display: "flex", flexDirection: "column", gap: 0.5 }}>
           <Typography variant="caption" sx={{ color: "#9e9e9e", fontWeight: 500 }}>
-            {CATEGORY_LABELS[product.category]}
+            {categoryMap[product.category] ?? product.category}
           </Typography>
           <Typography variant="body2" sx={{ fontWeight: 700, color: "#212121", lineHeight: 1.3, mb: 0.5 }}>
             {product.name}
@@ -107,8 +104,8 @@ export default function ProductCard({ product, onAddToOrder }: Props) {
         product={product}
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onAddToOrder={(p, qty, addons) => {
-          onAddToOrder?.(p, qty, addons);
+        onAddToOrder={(p, qty) => {
+          onAddToOrder?.(p, qty);
           setModalOpen(false);
         }}
       />

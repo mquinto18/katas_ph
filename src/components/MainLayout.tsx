@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
+import DesktopWindowsOutlinedIcon from "@mui/icons-material/DesktopWindowsOutlined";
 import ButtonBase from "@mui/material/ButtonBase";
 import Button from "@mui/material/Button";
 import Divider from "@mui/material/Divider";
@@ -14,15 +15,15 @@ import DeliveryDiningIcon from "@mui/icons-material/DeliveryDining";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import AddIcon from "@mui/icons-material/Add";
 import RemoveIcon from "@mui/icons-material/Remove";
+import InputAdornment from "@mui/material/InputAdornment";
+import TextField from "@mui/material/TextField";
+import SearchIcon from "@mui/icons-material/Search";
 import ProductCard, { type Product, type CategoryValue } from "./ProductCard";
 import CheckoutModal from "./CheckoutModal";
+import { fetchProducts } from "@/lib/productsService";
+import { useCategories } from "@/context/CategoriesContext";
+import CircularProgress from "@mui/material/CircularProgress";
 
-const CATEGORIES = [
-  { label: "All Menus", value: "all" },
-  { label: "Cafe & Drinks", value: "cafe" },
-  { label: "Meals", value: "meals" },
-  { label: "Food & Snack", value: "snack" },
-];
 
 const ORDER_TYPES = [
   { value: "dine-in",  label: "Dine-In",  Icon: DinnerDiningIcon },
@@ -30,48 +31,45 @@ const ORDER_TYPES = [
   { value: "delivery", label: "Delivery",  Icon: DeliveryDiningIcon },
 ];
 
-const PRODUCTS: Product[] = [
-  { id: 1,  name: "Fresh Mango Juice",    category: "cafe",   price: 65,  available: true,  image: "" },
-  { id: 2,  name: "Buko Pandan Shake",    category: "cafe",   price: 75,  available: true,  image: "" },
-  { id: 3,  name: "Calamansi Juice",      category: "cafe",   price: 55,  available: true,  image: "" },
-  { id: 4,  name: "Strawberry Shake",     category: "cafe",   price: 85,  available: false, image: "" },
-  { id: 5,  name: "Four Seasons Juice",   category: "cafe",   price: 70,  available: true,  image: "" },
-  { id: 6,  name: "Green Mango Juice",    category: "cafe",   price: 60,  available: true,  image: "" },
-  { id: 7,  name: "Watermelon Juice",     category: "snack",  price: 65,  available: false, image: "" },
-  { id: 8,  name: "Pineapple Juice",      category: "cafe",   price: 60,  available: true,  image: "" },
-  { id: 9,  name: "Grilled Chicken Rice", category: "meals",  price: 150, available: true,  image: "" },
-  { id: 10, name: "Banana Chips",         category: "snack",  price: 40,  available: true,  image: "" },
-];
 
 interface OrderItem {
   product: Product;
   quantity: number;
-  addons: string[];
 }
 
 export default function MainLayout() {
+  const { categories } = useCategories();
+  const CATEGORIES = [
+    { label: "All Menus", value: "all" },
+    ...categories.map((c) => ({ label: c.label, value: c.value })),
+  ];
   const [activeCategory, setActiveCategory] = useState("all");
   const [orderType, setOrderType] = useState("dine-in");
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
-  const filtered = activeCategory === "all"
-    ? PRODUCTS
-    : PRODUCTS.filter((p) => p.category === (activeCategory as CategoryValue));
+  useEffect(() => {
+    fetchProducts()
+      .then(setProducts)
+      .finally(() => setLoading(false));
+  }, []);
 
-  const handleAddToOrder = (product: Product, quantity: number, addons: string[]) => {
+  const filtered = products
+    .filter((p) => activeCategory === "all" || p.category === (activeCategory as CategoryValue))
+    .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
+
+  const handleAddToOrder = (product: Product, quantity: number) => {
     setOrderItems((prev) => {
-      const existing = prev.findIndex(
-        (item) =>
-          item.product.id === product.id &&
-          JSON.stringify(item.addons.slice().sort()) === JSON.stringify(addons.slice().sort())
-      );
+      const existing = prev.findIndex((item) => item.product.id === product.id);
       if (existing !== -1) {
         return prev.map((item, i) =>
           i === existing ? { ...item, quantity: item.quantity + quantity } : item
         );
       }
-      return [...prev, { product, quantity, addons }];
+      return [...prev, { product, quantity }];
     });
   };
 
@@ -87,26 +85,55 @@ export default function MainLayout() {
     setOrderItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const addonPrices: Record<string, number> = {
-    "Extra Tapioca": 15, "Whipped Cream": 20,
-    "Extra Rice": 25, "Extra Sauce": 10,
-    "Extra Dip": 10, "Large Pack": 20,
-  };
-
-  const getItemSubtotal = (item: OrderItem) => {
-    const addonTotal = item.addons.reduce((sum, a) => sum + (addonPrices[a] ?? 0), 0);
-    return (item.product.price + addonTotal) * item.quantity;
-  };
+  const getItemSubtotal = (item: OrderItem) => item.product.price * item.quantity;
 
   const orderTotal = orderItems.reduce((sum, item) => sum + getItemSubtotal(item), 0);
 
-  const handleConfirmOrder = (_paymentMethod: string) => {
+  const handleConfirmOrder = () => {
     setOrderItems([]);
     setCheckoutOpen(false);
   };
 
   return (
     <>
+      {/* ── Mobile notice overlay ── */}
+      <Box sx={{
+        display: { xs: "flex", sm: "none" },
+        position: "fixed", inset: 0, zIndex: 1100,
+        flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        backgroundColor: "rgba(255,255,255,0.96)",
+        backdropFilter: "blur(10px)",
+        px: 4, textAlign: "center",
+        gap: 2.5,
+      }}>
+        <Box sx={{
+          width: 72, height: 72, borderRadius: 3,
+          backgroundColor: "#f0faf0",
+          border: "1.5px solid #c8e6c9",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <DesktopWindowsOutlinedIcon sx={{ fontSize: 36, color: "#2E7D32" }} />
+        </Box>
+        <Box>
+          <Typography sx={{ fontWeight: 800, fontSize: "1.15rem", color: "#1a1a1a", mb: 0.75, lineHeight: 1.3 }}>
+            Best on a Larger Screen
+          </Typography>
+          <Typography sx={{ fontSize: "0.85rem", color: "#757575", lineHeight: 1.6, maxWidth: 280, mx: "auto" }}>
+            The Order page is designed for tablet or desktop use. Please switch to a larger screen for the best experience.
+          </Typography>
+        </Box>
+        <Box sx={{
+          px: 2.5, py: 1, borderRadius: 10,
+          backgroundColor: "#f5f5f5",
+          border: "1px solid #e0e0e0",
+        }}>
+          <Typography sx={{ fontSize: "0.75rem", color: "#9e9e9e", fontWeight: 600 }}>
+            Recommended: tablet or desktop
+          </Typography>
+        </Box>
+      </Box>
+
     <Box sx={{ display: "flex", flexDirection: "column", flex: 1, height: 0, minHeight: "100%" }}>
 
       {/* ── Shared full-width tab bar ── */}
@@ -160,22 +187,12 @@ export default function MainLayout() {
         {/* Right: Order Summary tab */}
         <Box
           sx={{
-            borderRadius: "10px 10px 0 0",
-            px: 3,
-            py: 1.1,
-            backgroundColor: "#ffffff",
-            borderTop: "1.5px solid rgba(0,0,0,0.08)",
-            borderLeft: "1.5px solid rgba(0,0,0,0.08)",
-            borderRight: "1.5px solid rgba(0,0,0,0.08)",
-            mb: "-2px",
-            position: "relative",
-            zIndex: 1,
+            borderRadius: "10px 10px 0 0", px: 3, py: 1.1, backgroundColor: "#ffffff",
+            borderTop: "1.5px solid rgba(0,0,0,0.08)", borderLeft: "1.5px solid rgba(0,0,0,0.08)",
+            borderRight: "1.5px solid rgba(0,0,0,0.08)", mb: "-2px", position: "relative", zIndex: 1,
           }}
         >
-          <Typography
-            variant="body2"
-            sx={{ fontWeight: 700, color: "#2E7D32", fontSize: "0.85rem", whiteSpace: "nowrap" }}
-          >
+          <Typography variant="body2" sx={{ fontWeight: 700, color: "#2E7D32", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
             Order Summary
           </Typography>
         </Box>
@@ -186,25 +203,64 @@ export default function MainLayout() {
 
         {/* Left: product grid */}
         <Box sx={{ flex: 1, backgroundColor: "#ffffff", p: { xs: 2, sm: 3 }, overflow: "auto" }}>
-          <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.75, mb: 2.5 }}>
-            <Typography variant="h6" sx={{ fontWeight: 800, color: "#212121" }}>{filtered.length}</Typography>
-            <Typography variant="body2" sx={{ color: "#9e9e9e", fontWeight: 500 }}>Products</Typography>
+          {/* Search + count row */}
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5, gap: 2 }}>
+            <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.75 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: "#212121" }}>{filtered.length}</Typography>
+              <Typography variant="body2" sx={{ color: "#9e9e9e", fontWeight: 500 }}>Products</Typography>
+            </Box>
+            <TextField
+              size="small"
+              placeholder="Search products..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon sx={{ fontSize: 18, color: "#bdbdbd" }} />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+              sx={{
+                width: 220,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  fontSize: "0.875rem",
+                  "&.Mui-focused fieldset": { borderColor: "#2E7D32" },
+                },
+              }}
+            />
           </Box>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "repeat(2,1fr)", sm: "repeat(3,1fr)", md: "repeat(3,1fr)", lg: "repeat(5,1fr)" },
-              gap: 2,
-            }}
-          >
-            {filtered.map((p) => (
-              <ProductCard
-                key={p.id}
-                product={p}
-                onAddToOrder={handleAddToOrder}
-              />
-            ))}
-          </Box>
+          {loading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+              <CircularProgress size={32} sx={{ color: "#2E7D32" }} />
+            </Box>
+          ) : filtered.length === 0 ? (
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 10, gap: 1.5 }}>
+              <SearchIcon sx={{ fontSize: 44, color: "#e8e8e8" }} />
+              <Typography variant="body2" sx={{ color: "#c0c0c0", fontWeight: 500 }}>
+                {search ? `No results for "${search}"` : "No items in this category"}
+              </Typography>
+            </Box>
+          ) : (
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "repeat(2,1fr)", sm: "repeat(3,1fr)", md: "repeat(3,1fr)", lg: "repeat(5,1fr)" },
+                gap: 2,
+              }}
+            >
+              {filtered.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  onAddToOrder={handleAddToOrder}
+                />
+              ))}
+            </Box>
+          )}
         </Box>
 
         {/* Right: order panel — fixed, no scroll */}
@@ -318,27 +374,6 @@ export default function MainLayout() {
                       </IconButton>
                     </Box>
 
-                    {/* Add-ons */}
-                    {item.addons.length > 0 && (
-                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, pl: 0.5 }}>
-                        {item.addons.map((addon) => (
-                          <Box
-                            key={addon}
-                            sx={{
-                              px: 0.75,
-                              py: 0.2,
-                              borderRadius: 1,
-                              backgroundColor: "#e8f5e9",
-                              fontSize: "0.65rem",
-                              color: "#2E7D32",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {addon}
-                          </Box>
-                        ))}
-                      </Box>
-                    )}
 
                     {/* Bottom row: qty controls + subtotal */}
                     <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>

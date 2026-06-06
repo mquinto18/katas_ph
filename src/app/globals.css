@@ -24,3 +24,10 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Bottom nav clearance on mobile */
+@media (max-width: 599px) {
+  .pb-safe {
+    padding-bottom: 64px;
+  }
+}
