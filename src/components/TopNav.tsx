@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AppBar from "@mui/material/AppBar";
 import Toolbar from "@mui/material/Toolbar";
@@ -20,14 +20,19 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { usePrinter } from "@/context/PrinterContext";
 
-interface TopNavProps {
-  user: User | null;
-}
-
-export default function TopNav({ user }: TopNavProps) {
+export default function TopNav() {
   const router = useRouter();
   const [anchor, setAnchor] = useState<null | HTMLElement>(null);
+  const [user, setUser] = useState<User | null>(null);
   const { connected, connecting, connect, disconnect } = usePrinter();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const displayName = user?.user_metadata?.full_name
     ?? user?.user_metadata?.name

@@ -9,7 +9,6 @@ import { Toaster } from "react-hot-toast";
 import { CategoriesProvider } from "@/context/CategoriesContext";
 import { BusinessSettingsProvider } from "@/context/BusinessSettingsContext";
 import { PrinterProvider } from "@/context/PrinterContext";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,14 +29,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="h-full flex flex-col overflow-hidden">
@@ -46,7 +42,7 @@ export default async function RootLayout({
             <BusinessSettingsProvider>
             <PrinterProvider>
               <GradientHeader>
-                <AppShell user={user}>
+                <AppShell>
                   {children}
                 </AppShell>
               </GradientHeader>

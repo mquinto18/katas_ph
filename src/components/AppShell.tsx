@@ -3,14 +3,12 @@
 import { usePathname } from "next/navigation";
 import SideNav from "./SideNav";
 import TopNav from "./TopNav";
-import type { User } from "@supabase/supabase-js";
 
 interface AppShellProps {
   children: React.ReactNode;
-  user: User | null;
 }
 
-export default function AppShell({ children, user }: AppShellProps) {
+export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
 
   if (pathname === "/login") {
@@ -21,7 +19,7 @@ export default function AppShell({ children, user }: AppShellProps) {
     <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
       <SideNav />
       <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", minHeight: 0 }}>
-        <TopNav user={user} />
+        <TopNav />
         <div
           style={{ flex: 1, overflow: "hidden", minHeight: 0, display: "flex", flexDirection: "column" }}
           className="pb-safe"
