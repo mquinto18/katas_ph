@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 import OrderHistoryLayout from "@/components/OrderHistoryLayout";
 
 export default function OrderHistoryPage() {

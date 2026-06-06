@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 import InventoryLayout from "@/components/InventoryLayout";
 
 export default function InventoryPage() {
