@@ -150,7 +150,7 @@ export default function MainLayout() {
         }}
       >
         {/* Left: category tabs */}
-        <Box sx={{ display: "flex", alignItems: "flex-end", gap: "6px" }}>
+        <Box sx={{ display: "flex", alignItems: "flex-end", gap: "6px", flexShrink: 1, minWidth: 0, overflowX: "auto", pb: "2px", mb: "-2px" }}>
           {CATEGORIES.map((cat) => {
             const isActive = activeCategory === cat.value;
             return (
@@ -224,7 +224,7 @@ export default function MainLayout() {
                 },
               }}
               sx={{
-                width: 220,
+                width: { xs: 140, sm: 180, md: 220 },
                 "& .MuiOutlinedInput-root": {
                   borderRadius: 2,
                   fontSize: "0.875rem",
@@ -248,7 +248,7 @@ export default function MainLayout() {
             <Box
               sx={{
                 display: "grid",
-                gridTemplateColumns: { xs: "repeat(2,1fr)", sm: "repeat(3,1fr)", md: "repeat(3,1fr)", lg: "repeat(5,1fr)" },
+                gridTemplateColumns: { xs: "repeat(2,1fr)", sm: "repeat(2,1fr)", md: "repeat(3,1fr)", lg: "repeat(5,1fr)" },
                 gap: 2,
               }}
             >
@@ -266,7 +266,7 @@ export default function MainLayout() {
         {/* Right: order panel — fixed, no scroll */}
         <Box
           sx={{
-            width: { xs: "100%", md: 300, lg: 340 },
+            width: { xs: "100%", sm: 260, md: 300, lg: 340 },
             flexShrink: 0,
             backgroundColor: "#ffffff",
             borderLeft: "1px solid #f0f0f0",

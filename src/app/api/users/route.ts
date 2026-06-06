@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { NextResponse, type NextRequest } from "next/server";
 
 export const runtime = "edge";
@@ -14,7 +14,7 @@ export async function GET() {
   const user = await requireAuth();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
+  const { data: { users }, error } = await getSupabaseAdmin().auth.admin.listUsers();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json(users);
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "All fields are required." }, { status: 400 });
   }
 
-  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+  const { data, error } = await getSupabaseAdmin().auth.admin.createUser({
     email: email.trim().toLowerCase(),
     password,
     email_confirm: true,
@@ -51,7 +51,7 @@ export async function DELETE(req: NextRequest) {
   if (!targetId) return NextResponse.json({ error: "User ID required." }, { status: 400 });
   if (targetId === user.id) return NextResponse.json({ error: "You cannot delete your own account." }, { status: 400 });
 
-  const { error } = await supabaseAdmin.auth.admin.deleteUser(targetId);
+  const { error } = await getSupabaseAdmin().auth.admin.deleteUser(targetId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ success: true });
