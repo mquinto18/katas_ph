@@ -2,7 +2,6 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { NextResponse, type NextRequest } from "next/server";
 
-export const runtime = "edge";
 
 async function requireAuth() {
   const supabase = await createServerSupabaseClient();

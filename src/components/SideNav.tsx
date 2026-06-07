@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -22,6 +23,11 @@ const NAV_ITEMS = [
 
 export default function SideNav() {
   const pathname = usePathname();
+  // Optimistic highlight: light up the clicked item immediately instead of
+  // waiting for the navigation to complete.
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  useEffect(() => setPendingHref(null), [pathname]);
+  const activeHref = pendingHref ?? pathname;
 
   return (
     <>
@@ -48,12 +54,13 @@ export default function SideNav() {
         </Box>
 
         {NAV_ITEMS.map(({ href, label, Icon }) => {
-          const isActive = pathname === href;
+          const isActive = activeHref === href;
           return (
             <Tooltip key={href} title={label} placement="right" arrow>
               <Box
                 component={Link}
                 href={href}
+                onClick={() => setPendingHref(href)}
                 sx={{
                   width: 52, height: 52,
                   borderRadius: 2.5,
@@ -102,12 +109,13 @@ export default function SideNav() {
         }}
       >
         {NAV_ITEMS.map(({ href, label, Icon }) => {
-          const isActive = pathname === href;
+          const isActive = activeHref === href;
           return (
             <Box
               key={href}
               component={Link}
               href={href}
+              onClick={() => setPendingHref(href)}
               sx={{
                 flex: 1,
                 display: "flex", flexDirection: "column",

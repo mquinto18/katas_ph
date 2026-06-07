@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 import MainLayout from "@/components/MainLayout";
 
 export default function OrdersPage() {

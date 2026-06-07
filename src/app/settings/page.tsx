@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 import SettingsLayout from "@/components/SettingsLayout";
 
 export default function SettingsPage() {

@@ -1,4 +1,3 @@
-export const runtime = 'edge';
 import DashboardLayout from "@/components/DashboardLayout";
 
 export default function DashboardPage() {

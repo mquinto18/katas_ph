@@ -25,7 +25,11 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  // getClaims() validates the JWT locally (no network round-trip to Supabase
+  // on every navigation, unlike getUser) — falls back to a server check only
+  // for projects still on the legacy symmetric JWT secret.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
   const { pathname } = request.nextUrl;
 
   const isAuthRoute = pathname === "/login" || pathname.startsWith("/auth/");
